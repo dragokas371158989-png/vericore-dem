@@ -3,11 +3,12 @@
 
   const config = window.VERICORE_CONFIG || {};
   const API_BASE_URL = String(config.API_BASE_URL || '').replace(/\/$/, '');
-  const CLIENT_VERSION = String(config.CLIENT_VERSION || 'web-v3.2');
-  const STORAGE_REPORTS = 'vericore_v32_reports';
-  const STORAGE_AUDIT = 'vericore_v32_audit';
+  const CLIENT_VERSION = String(config.CLIENT_VERSION || 'web-v3.3');
+  const TURNSTILE_SITEKEY = String(config.TURNSTILE_SITEKEY || '');
+  const STORAGE_REPORTS = 'vericore_v33_reports';
+  const STORAGE_AUDIT = 'vericore_v33_audit';
   const STORAGE_THEME = 'vericore_v3_theme';
-  const LEGACY_STORAGE_KEYS = ['vericore_v3_reports', 'vericore_v3_audit'];
+  const LEGACY_STORAGE_KEYS = ['vericore_v3_reports', 'vericore_v3_audit', 'vericore_v32_reports', 'vericore_v32_audit'];
   const TEST_PROFILE = Object.freeze({
     fullName: 'Demo User',
     dob: '1990-01-15',
@@ -30,6 +31,9 @@
   let apiOnline = false;
   let apiMode = 'unknown';
   let toastTimer = null;
+  let turnstileToken = '';
+  let turnstileWidgetId = null;
+  let turnstileReady = false;
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>'"]/g, char => ({
@@ -89,6 +93,58 @@
     renderAudit();
   }
 
+  function updateTurnstileStatus(message, state = '') {
+    const status = $('#turnstileStatus');
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.state = state;
+  }
+
+  function renderTurnstile() {
+    if (turnstileReady || !TURNSTILE_SITEKEY || !window.turnstile) return;
+
+    try {
+      turnstileWidgetId = window.turnstile.render('#turnstileWidget', {
+        sitekey: TURNSTILE_SITEKEY,
+        theme: 'auto',
+        size: 'flexible',
+        action: 'vericore_sandbox_verify',
+        callback: token => {
+          turnstileToken = String(token || '');
+          turnstileReady = Boolean(turnstileToken);
+          updateTurnstileStatus('Проверка пройдена. Токен действует 5 минут.', 'success');
+        },
+        'expired-callback': () => {
+          turnstileToken = '';
+          turnstileReady = false;
+          updateTurnstileStatus('Токен истёк. Пройди проверку ещё раз.', 'warning');
+        },
+        'error-callback': () => {
+          turnstileToken = '';
+          turnstileReady = false;
+          updateTurnstileStatus('Turnstile не загрузился. Обнови страницу.', 'error');
+        }
+      });
+      updateTurnstileStatus('Ожидаем anti-bot проверку…');
+    } catch (error) {
+      console.warn('Turnstile render error:', error);
+      updateTurnstileStatus('Не удалось запустить Turnstile.', 'error');
+    }
+  }
+
+  function resetTurnstile() {
+    turnstileToken = '';
+    turnstileReady = false;
+    if (window.turnstile && turnstileWidgetId !== null) {
+      try {
+        window.turnstile.reset(turnstileWidgetId);
+        updateTurnstileStatus('Ожидаем новую anti-bot проверку…');
+      } catch (error) {
+        console.warn('Turnstile reset error:', error);
+      }
+    }
+  }
+
   function isApiConfigured() {
     return /^https:\/\/.+/.test(API_BASE_URL) && !API_BASE_URL.includes('PASTE_YOUR_WORKER_URL_HERE');
   }
@@ -130,7 +186,8 @@
       clearTimeout(timer);
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok !== true) throw new Error(data.error || 'Health check failed');
-      setApiStatus('online', data.mode || 'sandbox');
+      const dbNote = data.auditDatabaseConnected ? 'D1 audit online' : 'D1 audit not connected';
+      setApiStatus('online', data.mode || 'sandbox', `${API_BASE_URL.replace(/^https:\/\//, '')} • ${dbNote}`);
     } catch (error) {
       setApiStatus('offline', 'unknown', 'Worker не отвечает или CORS не настроен');
       console.warn('VeriCore API health error:', error);
@@ -178,6 +235,10 @@
       return 'Подтверди все три пункта согласия.';
     }
 
+    if (!payload.turnstileToken) {
+      return 'Сначала пройди anti-bot проверку Turnstile.';
+    }
+
     const normalized = payload.ssn.replace(/\D/g, '');
     if (apiMode !== 'live' && normalized !== '000123456') {
       return 'В sandbox разрешён только тестовый SSN 000-12-3456.';
@@ -206,7 +267,8 @@
       selfCheck: $('#selfCheck').checked,
       consentAccepted: $('#consent').checked,
       sandboxConfirmed: $('#sandboxConfirm').checked,
-      consentTimestamp: new Date().toISOString()
+      consentTimestamp: new Date().toISOString(),
+      turnstileToken
     };
   }
 
@@ -220,6 +282,8 @@
       dobMasked: apiResult.subject?.dobMasked || '****-**-**',
       maskedSsn: apiResult.maskedSsn || apiResult.subject?.maskedSsn || '***-**-****',
       consentReceipt: apiResult.consentReceipt || '',
+      serverAuditId: apiResult.audit?.id || '',
+      auditStored: apiResult.audit?.stored === true,
       identity: apiResult.identity ? {
         ...apiResult.identity,
         match: apiResult.identity.match ?? apiResult.identity.verified ?? null
@@ -299,15 +363,18 @@
 
       const report = saveReport(data, checkType);
       addAudit('Sandbox verification completed', `${report.reference} • ${report.maskedSsn}`);
-      formMessage.textContent = 'Проверка завершена. В браузере сохранены только маски и итог.';
+      const auditText = report.auditStored ? ' Серверный audit сохранён в D1.' : ' D1 пока не подключена — серверный audit не сохранён.';
+      formMessage.textContent = `Проверка завершена. В браузере сохранены только маски и итог.${auditText}`;
       formMessage.classList.add('success');
       clearSensitiveFields();
+      resetTurnstile();
       openReport(report);
       renderOverview();
       renderReports();
     } catch (error) {
       formMessage.textContent = `Ошибка API: ${error.message}`;
       addAudit('Verification failed', 'Request rejected or unavailable');
+      resetTurnstile();
     } finally {
       requestBody = '';
       submitButton.disabled = false;
@@ -408,6 +475,7 @@
         <div><span>Risk level</span><strong>${escapeHtml(report.risk?.level || '—')}</strong></div>
         <div><span>Provider</span><strong>${escapeHtml(identity.source || credit.source || 'Sandbox')}</strong></div>
         <div><span>Consent receipt</span><strong>${escapeHtml(report.consentReceipt ? report.consentReceipt.slice(0, 16) + '…' : '—')}</strong></div>
+        <div><span>Server audit</span><strong>${escapeHtml(report.auditStored ? (report.serverAuditId ? report.serverAuditId.slice(0, 16) + '…' : 'Stored') : 'Not stored')}</strong></div>
       </div>
 
       <div class="notice warning" style="margin-top:20px">
@@ -430,6 +498,8 @@
       credit: { score: 742, model: 'DemoScore 3.2', source: 'VeriCore Sandbox' },
       risk: { level: 'Low' },
       createdAt: new Date().toISOString(),
+      auditStored: true,
+      serverAuditId: 'AUD-SAMPLE-3001',
       disclaimer: 'Simulated result. Not returned by SSA, Experian, Equifax, TransUnion, or any consumer reporting agency.'
     });
   }
@@ -453,6 +523,7 @@
     form.addEventListener('submit', submitVerification);
     window.addEventListener('pagehide', clearSensitiveFields);
     window.addEventListener('beforeunload', clearSensitiveFields);
+    window.addEventListener('vericore-turnstile-ready', renderTurnstile);
 
     $('#clearReportsButton').addEventListener('click', () => {
       if (!confirm('Удалить локальную историю отчётов?')) return;
@@ -476,7 +547,7 @@
   }
 
   function init() {
-    // V3.1 сохраняла больше полей в локальной истории. Удаляем старые записи при переходе на V3.2.
+    // Удаляем старые локальные записи при переходе на V3.3.
     LEGACY_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
     applyTheme(localStorage.getItem(STORAGE_THEME) || 'dark');
     bindEvents();
@@ -484,6 +555,7 @@
     renderReports();
     renderAudit();
     checkApi();
+    if (window.turnstile) renderTurnstile();
   }
 
   init();

@@ -395,3 +395,28 @@ select option { color: #10213a; }
   .audit-row { grid-template-columns: 1fr; gap: 3px; }
   .footer { width: calc(100% - 28px); flex-direction: column; }
 }
+
+
+/* V3.3 Turnstile */
+.turnstile-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(280px, auto);
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255,255,255,.025);
+}
+.turnstile-panel > div:first-child { display: grid; gap: 5px; }
+.turnstile-panel strong { color: var(--text); }
+.turnstile-panel span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.turnstile-panel span[data-state="success"] { color: #72e8ae; }
+.turnstile-panel span[data-state="warning"] { color: #f3c86a; }
+.turnstile-panel span[data-state="error"] { color: #ff8b9a; }
+.turnstile-widget { min-height: 65px; display: flex; justify-content: flex-end; }
+@media (max-width: 760px) {
+  .turnstile-panel { grid-template-columns: 1fr; }
+  .turnstile-widget { justify-content: flex-start; max-width: 100%; overflow: hidden; }
+}

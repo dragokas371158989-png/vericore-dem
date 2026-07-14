@@ -4,11 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#08111f" />
-  <meta name="description" content="VeriCore — защищённый sandbox-интерфейс проверки совпадения данных с маскированным демо-отчётом." />
-  <meta name="referrer" content="no-referrer" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://vericore-api.dragokas371158989.workers.dev; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" />
-  <title>VeriCore V3.2 — Secure Verification Sandbox</title>
-  <link rel="stylesheet" href="styles.css?v=3.2" />
+  <meta name="description" content="VeriCore — sandbox-интерфейс проверки совпадения SSN, имени и даты рождения с кредитным демо-отчётом." />
+  <title>VeriCore V3.3 — Protected Verification Sandbox</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=3.3" />
 </head>
 <body>
   <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -17,7 +18,7 @@
   <header class="topbar">
     <a class="brand" href="#home" aria-label="VeriCore home">
       <span class="brand-icon">V</span>
-      <span class="brand-copy"><strong>VeriCore</strong><small>V3.2 SECURE SANDBOX</small></span>
+      <span class="brand-copy"><strong>VeriCore</strong><small>V3.3 PROTECTED SANDBOX</small></span>
     </a>
 
     <nav class="nav" aria-label="Основная навигация">
@@ -38,8 +39,8 @@
         <div class="eyebrow"><span></span> SELF-CHECK • CONSENT REQUIRED</div>
         <h1>Проверка совпадения данных и кредитный отчёт <em>в одном кабинете</em></h1>
         <p class="hero-text">
-          Текущая версия работает в sandbox-режиме через Cloudflare Worker. API принимает запросы только с этого сайта,
-          ограничивает частоту обращений и не сохраняет в браузере имя, email, дату рождения или полный SSN.
+          Текущая версия работает в sandbox-режиме через Cloudflare Worker. Она имитирует ответ провайдера,
+          не хранит полный SSN и не позволяет проверять третьих лиц.
         </p>
 
         <div class="hero-buttons">
@@ -50,7 +51,7 @@
         <div class="trust-strip">
           <div><strong>Self-check only</strong><span>проверка только собственных данных</span></div>
           <div><strong>Masked SSN</strong><span>в истории только последние 4 цифры</span></div>
-          <div><strong>Origin locked</strong><span>API принимает только этот сайт</span></div>
+          <div><strong>Server sandbox</strong><span>ответ через Cloudflare Worker</span></div>
         </div>
       </div>
 
@@ -70,7 +71,7 @@
           <div class="score-copy">
             <span>Credit score</span>
             <strong>742</strong>
-            <small>DemoScore 3.0</small>
+            <small>DemoScore 3.3</small>
           </div>
         </div>
 
@@ -148,10 +149,10 @@
 
         <section class="view active" id="view-overview">
           <div class="stats-grid">
-            <article class="stat-card"><span>Отчётов</span><strong id="statReports">0</strong><small>только маскированные данные</small></article>
+            <article class="stat-card"><span>Отчётов</span><strong id="statReports">0</strong><small>в этом браузере</small></article>
             <article class="stat-card"><span>Сегодня</span><strong id="statToday">0</strong><small>создано проверок</small></article>
             <article class="stat-card"><span>API</span><strong id="statApi">—</strong><small id="statApiNote">проверка статуса</small></article>
-            <article class="stat-card"><span>Режим</span><strong id="statMode">Sandbox</strong><small>5 запросов / 10 минут</small></article>
+            <article class="stat-card"><span>Режим</span><strong id="statMode">Sandbox</strong><small>реальные данные заблокированы</small></article>
           </div>
 
           <div class="overview-grid">
@@ -176,7 +177,7 @@
 
         <section class="view" id="view-new-check">
           <div class="form-layout">
-            <form class="verification-form panel" id="verificationForm" autocomplete="off" novalidate>
+            <form class="verification-form panel" id="verificationForm" novalidate>
               <div class="panel-heading form-heading">
                 <div><span class="micro-label">NEW REQUEST</span><h3>Проверка собственных данных</h3></div>
                 <span class="pill neutral">Sandbox</span>
@@ -197,13 +198,13 @@
               </fieldset>
 
               <div class="form-grid two">
-                <label>Full legal name<input id="fullName" name="fullName" autocomplete="off" autocapitalize="words" spellcheck="false" required placeholder="Demo User" /></label>
+                <label>Full legal name<input id="fullName" name="fullName" autocomplete="name" required placeholder="Demo User" /></label>
                 <label>Date of birth<input id="dob" name="dob" type="date" required /></label>
               </div>
 
               <div class="form-grid two">
-                <label>SSN<input id="ssn" name="ssn" inputmode="numeric" autocomplete="off" autocapitalize="none" spellcheck="false" required maxlength="11" placeholder="000-12-3456" /></label>
-                <label>Email<input id="email" name="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="demo@example.com" /></label>
+                <label>SSN<input id="ssn" name="ssn" inputmode="numeric" autocomplete="off" required maxlength="11" placeholder="000-12-3456" /></label>
+                <label>Email<input id="email" name="email" type="email" autocomplete="email" required placeholder="demo@example.com" /></label>
               </div>
 
               <div class="form-grid two">
@@ -217,6 +218,15 @@
                 <label class="checkbox-row"><input id="sandboxConfirm" name="sandboxConfirm" type="checkbox" required /><span>Я понимаю, что результат является симуляцией и не получен от SSA или кредитного бюро.</span></label>
               </div>
 
+
+              <div class="turnstile-panel">
+                <div>
+                  <strong>Anti-bot verification</strong>
+                  <span id="turnstileStatus">Загружаем Cloudflare Turnstile…</span>
+                </div>
+                <div id="turnstileWidget" class="turnstile-widget" aria-label="Cloudflare Turnstile"></div>
+              </div>
+
               <div class="form-footer">
                 <div id="formMessage" class="form-message" role="status"></div>
                 <button class="button button-primary" id="submitButton" type="submit">Запустить sandbox-проверку</button>
@@ -228,9 +238,9 @@
               <h3>Что отправляется</h3>
               <ul class="flow-list">
                 <li><span>1</span><div><strong>Frontend</strong><small>проверяет согласие и формат</small></div></li>
-                <li><span>2</span><div><strong>Cloudflare Worker</strong><small>блокирует живые SSN в sandbox</small></div></li>
-                <li><span>3</span><div><strong>Provider adapter</strong><small>сейчас возвращает тестовый ответ</small></div></li>
-                <li><span>4</span><div><strong>Browser history</strong><small>только reference, маски и итог</small></div></li>
+                <li><span>2</span><div><strong>Turnstile + Worker</strong><small>валидирует одноразовый anti-bot token</small></div></li>
+                <li><span>3</span><div><strong>Provider adapter</strong><small>возвращает только sandbox-ответ</small></div></li>
+                <li><span>4</span><div><strong>D1 audit</strong><small>пишет маски и хеши без полного SSN</small></div></li>
               </ul>
             </aside>
           </div>
@@ -258,14 +268,14 @@
         <h2>Граница между sandbox и live</h2>
       </div>
       <div class="security-grid">
-        <article><strong>Сейчас</strong><p>Origin lock, лимит запросов, только тестовый профиль, simulated match и simulated credit score.</p></article>
+        <article><strong>Сейчас</strong><p>Только тестовый профиль, simulated match и simulated credit score.</p></article>
         <article><strong>Перед live</strong><p>Регистрация бизнеса, договор с провайдером, FCRA permissible purpose и корректное согласие.</p></article>
         <article><strong>В live</strong><p>API-ключи только в Cloudflare Secrets, полный SSN не сохраняется в браузере или GitHub.</p></article>
       </div>
     </section>
   </main>
 
-  <footer class="footer"><strong>VeriCore V3.2</strong><span>Secure verification sandbox • Not a consumer reporting agency</span></footer>
+  <footer class="footer"><strong>VeriCore V3.3</strong><span>Protected sandbox • Turnstile validation • Masked audit records</span></footer>
 
   <dialog class="report-modal" id="reportModal">
     <div class="modal-shell">
@@ -275,7 +285,13 @@
   </dialog>
 
   <div class="toast" id="toast" role="status"></div>
-  <script src="config.js?v=3.2"></script>
-  <script src="app.js?v=3.2"></script>
+  <script>
+    window.onVeriCoreTurnstileLoad = function () {
+      window.dispatchEvent(new Event('vericore-turnstile-ready'));
+    };
+  </script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onVeriCoreTurnstileLoad" defer></script>
+  <script src="config.js?v=3.3"></script>
+  <script src="app.js?v=3.3"></script>
 </body>
 </html>
