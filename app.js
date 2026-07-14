@@ -3,9 +3,11 @@
 
   const config = window.VERICORE_CONFIG || {};
   const API_BASE_URL = String(config.API_BASE_URL || '').replace(/\/$/, '');
-  const STORAGE_REPORTS = 'vericore_v3_reports';
-  const STORAGE_AUDIT = 'vericore_v3_audit';
+  const CLIENT_VERSION = String(config.CLIENT_VERSION || 'web-v3.2');
+  const STORAGE_REPORTS = 'vericore_v32_reports';
+  const STORAGE_AUDIT = 'vericore_v32_audit';
   const STORAGE_THEME = 'vericore_v3_theme';
+  const LEGACY_STORAGE_KEYS = ['vericore_v3_reports', 'vericore_v3_audit'];
   const TEST_PROFILE = Object.freeze({
     fullName: 'Demo User',
     dob: '1990-01-15',
@@ -119,7 +121,10 @@
       const timer = setTimeout(() => controller.abort(), 7000);
       const response = await fetch(`${API_BASE_URL}/api/health`, {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-VeriCore-Client': CLIENT_VERSION },
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
         signal: controller.signal
       });
       clearTimeout(timer);
@@ -205,18 +210,16 @@
     };
   }
 
-  function saveReport(apiResult, payload) {
+  function saveReport(apiResult, checkType) {
     const report = {
       id: apiResult.reportId || makeId(),
       reference: apiResult.reference || `VC-${Date.now().toString().slice(-8)}`,
       providerMode: apiResult.providerMode || apiResult.mode || 'sandbox',
-      checkType: payload.checkType,
-      fullName: payload.fullName,
-      email: payload.email,
-      dob: payload.dob,
-      maskedSsn: apiResult.maskedSsn || apiResult.subject?.maskedSsn || '***-**-3456',
-      purpose: payload.purpose,
-      state: payload.state,
+      checkType,
+      subjectLabel: apiResult.subject?.label || 'Masked subject',
+      dobMasked: apiResult.subject?.dobMasked || '****-**-**',
+      maskedSsn: apiResult.maskedSsn || apiResult.subject?.maskedSsn || '***-**-****',
+      consentReceipt: apiResult.consentReceipt || '',
       identity: apiResult.identity ? {
         ...apiResult.identity,
         match: apiResult.identity.match ?? apiResult.identity.verified ?? null
@@ -231,6 +234,13 @@
     reports.unshift(report);
     writeArray(STORAGE_REPORTS, reports.slice(0, 100));
     return report;
+  }
+
+  function clearSensitiveFields() {
+    ['fullName', 'dob', 'ssn', 'email'].forEach(id => {
+      const field = $(`#${id}`);
+      if (field) field.value = '';
+    });
   }
 
   async function submitVerification(event) {
@@ -254,27 +264,52 @@
     submitButton.disabled = true;
     submitButton.textContent = 'Проверяем…';
 
+    const checkType = payload.checkType;
+    const requestId = payload.requestId;
+    let requestBody = JSON.stringify(payload);
+
+    // Поле очищается до сетевого ответа. Значение не пишется в localStorage или журнал.
+    $('#ssn').value = '';
+    payload.fullName = '';
+    payload.dob = '';
+    payload.ssn = '';
+    payload.email = '';
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(payload)
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-VeriCore-Client': CLIENT_VERSION,
+          'X-Request-Id': requestId
+        },
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        body: requestBody
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      if (!response.ok) {
+        const retryText = response.status === 429 && data.retryAfter
+          ? ` Повтори через ${data.retryAfter} сек.`
+          : '';
+        throw new Error(`${data.error || `HTTP ${response.status}`}${retryText}`);
+      }
 
-      const report = saveReport(data, payload);
+      const report = saveReport(data, checkType);
       addAudit('Sandbox verification completed', `${report.reference} • ${report.maskedSsn}`);
-      formMessage.textContent = 'Проверка завершена. Создан маскированный sandbox-отчёт.';
+      formMessage.textContent = 'Проверка завершена. В браузере сохранены только маски и итог.';
       formMessage.classList.add('success');
-      $('#ssn').value = '';
+      clearSensitiveFields();
       openReport(report);
       renderOverview();
       renderReports();
     } catch (error) {
       formMessage.textContent = `Ошибка API: ${error.message}`;
-      addAudit('Verification failed', error.message);
+      addAudit('Verification failed', 'Request rejected or unavailable');
     } finally {
+      requestBody = '';
       submitButton.disabled = false;
       submitButton.textContent = 'Запустить sandbox-проверку';
     }
@@ -303,7 +338,7 @@
     const creditScore = report.credit?.score ?? '—';
     return `
       <div class="report-row">
-        <div class="report-main"><strong>${escapeHtml(report.fullName)}</strong><span>${escapeHtml(report.reference)} • ${escapeHtml(report.maskedSsn)}</span></div>
+        <div class="report-main"><strong>${escapeHtml(report.subjectLabel || 'Masked subject')}</strong><span>${escapeHtml(report.reference)} • ${escapeHtml(report.maskedSsn)}</span></div>
         <div class="report-cell"><span>Identity</span><strong>${escapeHtml(identityStatus)}</strong></div>
         <div class="report-cell"><span>Credit</span><strong>${escapeHtml(creditScore)}</strong></div>
         <button class="report-action" type="button" data-report-id="${escapeHtml(report.id)}">Открыть</button>
@@ -366,12 +401,13 @@
       </div>
 
       <div class="details-grid">
-        <div><span>Full name</span><strong>${escapeHtml(report.fullName)}</strong></div>
+        <div><span>Subject</span><strong>${escapeHtml(report.subjectLabel || 'Masked subject')}</strong></div>
         <div><span>SSN</span><strong>${escapeHtml(report.maskedSsn)}</strong></div>
-        <div><span>Date of birth</span><strong>${escapeHtml(report.dob)}</strong></div>
+        <div><span>Date of birth</span><strong>${escapeHtml(report.dobMasked || '****-**-**')}</strong></div>
         <div><span>Death indicator</span><strong>${escapeHtml(deathText)}</strong></div>
         <div><span>Risk level</span><strong>${escapeHtml(report.risk?.level || '—')}</strong></div>
         <div><span>Provider</span><strong>${escapeHtml(identity.source || credit.source || 'Sandbox')}</strong></div>
+        <div><span>Consent receipt</span><strong>${escapeHtml(report.consentReceipt ? report.consentReceipt.slice(0, 16) + '…' : '—')}</strong></div>
       </div>
 
       <div class="notice warning" style="margin-top:20px">
@@ -387,11 +423,11 @@
       id: 'sample',
       reference: 'VC-SAMPLE-3001',
       providerMode: 'sandbox',
-      fullName: 'Demo User',
-      dob: '1990-01-15',
+      subjectLabel: 'D*** U***',
+      dobMasked: '1990-**-**',
       maskedSsn: '***-**-3456',
       identity: { match: true, confidence: 94, deathIndicator: false, source: 'VeriCore Sandbox' },
-      credit: { score: 742, model: 'DemoScore 3.0', source: 'VeriCore Sandbox' },
+      credit: { score: 742, model: 'DemoScore 3.2', source: 'VeriCore Sandbox' },
       risk: { level: 'Low' },
       createdAt: new Date().toISOString(),
       disclaimer: 'Simulated result. Not returned by SSA, Experian, Equifax, TransUnion, or any consumer reporting agency.'
@@ -415,6 +451,8 @@
     });
     $('#ssn').addEventListener('input', event => { event.target.value = formatSsnInput(event.target.value); });
     form.addEventListener('submit', submitVerification);
+    window.addEventListener('pagehide', clearSensitiveFields);
+    window.addEventListener('beforeunload', clearSensitiveFields);
 
     $('#clearReportsButton').addEventListener('click', () => {
       if (!confirm('Удалить локальную историю отчётов?')) return;
@@ -438,6 +476,8 @@
   }
 
   function init() {
+    // V3.1 сохраняла больше полей в локальной истории. Удаляем старые записи при переходе на V3.2.
+    LEGACY_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
     applyTheme(localStorage.getItem(STORAGE_THEME) || 'dark');
     bindEvents();
     renderOverview();

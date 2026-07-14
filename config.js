@@ -1,4 +1,5 @@
 window.VERICORE_CONFIG = Object.freeze({
   API_BASE_URL: 'https://vericore-api.dragokas371158989.workers.dev',
-  APP_MODE: 'sandbox'
+  APP_MODE: 'sandbox',
+  CLIENT_VERSION: 'web-v3.2'
 });
