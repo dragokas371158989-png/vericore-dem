@@ -1,84 +1,37 @@
 (() => {
   'use strict';
 
-  const STORAGE_REPORTS = 'vericore_demo_reports_v2';
-  const STORAGE_AUDIT = 'vericore_demo_audit_v2';
-  const STORAGE_THEME = 'vericore_demo_theme_v2';
-  const OLD_REPORTS = 'vericore_demo_reports_v1';
-  const OLD_AUDIT = 'vericore_demo_audit_v1';
-  const DEMO_SSN_DIGITS = '000123456';
+  const config = window.VERICORE_CONFIG || {};
+  const API_BASE_URL = String(config.API_BASE_URL || '').replace(/\/$/, '');
+  const STORAGE_REPORTS = 'vericore_v3_reports';
+  const STORAGE_AUDIT = 'vericore_v3_audit';
+  const STORAGE_THEME = 'vericore_v3_theme';
+  const TEST_PROFILE = Object.freeze({
+    fullName: 'Demo User',
+    dob: '1990-01-15',
+    ssn: '000-12-3456',
+    email: 'demo@example.com',
+    purpose: 'self_check',
+    state: 'TX'
+  });
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
   const form = $('#verificationForm');
-  const modal = $('#reportModal');
   const formMessage = $('#formMessage');
-  const reportList = $('#reportList');
-  const clientList = $('#clientList');
-  const auditList = $('#auditList');
-  const workspaceTitle = $('#workspaceTitle');
+  const submitButton = $('#submitButton');
+  const reportModal = $('#reportModal');
+  const modalContent = $('#modalContent');
   const toast = $('#toast');
 
-  let currentReportId = null;
+  let apiOnline = false;
+  let apiMode = 'unknown';
   let toastTimer = null;
-
-  function readStorage(key) {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(key) || '[]');
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function writeStorage(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch {
-      showToast('Не удалось сохранить данные в браузере.');
-      return false;
-    }
-  }
-
-  function migrateV1() {
-    if (!localStorage.getItem(STORAGE_REPORTS)) {
-      const oldReports = readStorage(OLD_REPORTS);
-      if (oldReports.length) {
-        const migrated = oldReports.map((row, index) => ({
-          id: row.id || `legacy-${index}-${Date.now()}`,
-          reference: row.reference || makeReference(),
-          name: row.name || 'Legacy Demo Client',
-          email: `legacy.demo.${index + 1}@example.com`,
-          dob: '1990-01-15',
-          ssn: row.ssn || '***-**-0000',
-          address: 'Imported from V1',
-          city: 'Demo City',
-          state: 'TX',
-          zip: '00000',
-          purpose: 'user_request',
-          type: row.type || 'ssn',
-          typeLabel: row.typeLabel || 'SSN Verification',
-          identityScore: 92,
-          creditScore: 742,
-          risk: 'Low',
-          createdAt: row.createdAt || new Date().toISOString(),
-          migrated: true
-        }));
-        writeStorage(STORAGE_REPORTS, migrated);
-      }
-    }
-
-    if (!localStorage.getItem(STORAGE_AUDIT)) {
-      const oldAudit = readStorage(OLD_AUDIT);
-      if (oldAudit.length) writeStorage(STORAGE_AUDIT, oldAudit);
-    }
-  }
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>'"]/g, char => ({
-      '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
     }[char]));
   }
 
@@ -86,511 +39,412 @@
     return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  function makeReference() {
-    const stamp = Date.now().toString().slice(-7);
-    return `DEMO-VC-${stamp}`;
-  }
-
-  function maskSSN(value) {
-    const last4 = String(value).replace(/\D/g, '').slice(-4);
-    return `***-**-${last4 || '0000'}`;
-  }
-
-  function formatDate(iso) {
+  function readArray(key) {
     try {
-      return new Intl.DateTimeFormat('ru-RU', {
-        dateStyle:'medium',
-        timeStyle:'short'
-      }).format(new Date(iso));
+      const value = JSON.parse(localStorage.getItem(key) || '[]');
+      return Array.isArray(value) ? value : [];
     } catch {
-      return '—';
+      return [];
     }
   }
 
-  function formatDateOnly(iso) {
+  function writeArray(key, value) {
     try {
-      return new Intl.DateTimeFormat('ru-RU', { dateStyle:'medium' }).format(new Date(iso));
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
     } catch {
-      return '—';
+      showToast('Браузер не разрешил сохранить локальную историю.');
+      return false;
     }
-  }
-
-  function sameLocalDay(first, second) {
-    const a = new Date(first);
-    const b = new Date(second);
-    return a.getFullYear() === b.getFullYear()
-      && a.getMonth() === b.getMonth()
-      && a.getDate() === b.getDate();
-  }
-
-  function initials(name) {
-    return String(name || 'DC')
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map(part => part[0]?.toUpperCase() || '')
-      .join('') || 'DC';
-  }
-
-  function purposeLabel(value) {
-    return {
-      user_request:'Запрос пользователя',
-      tenant:'Проверка арендатора',
-      employment:'Проверка кандидата',
-      lending:'Кредитная заявка'
-    }[value] || 'Demo purpose';
-  }
-
-  function addAudit(action, detail = '') {
-    const rows = readStorage(STORAGE_AUDIT);
-    rows.unshift({ id:makeId(), time:new Date().toISOString(), action, detail });
-    writeStorage(STORAGE_AUDIT, rows.slice(0, 100));
-    renderAudit();
-    renderOverview();
   }
 
   function showToast(message) {
     toast.textContent = message;
     toast.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+  }
+
+  function formatDate(value) {
+    try {
+      return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+    } catch {
+      return '—';
+    }
+  }
+
+  function formatSsnInput(value) {
+    const digits = String(value).replace(/\D/g, '').slice(0, 9);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+  }
+
+  function addAudit(action, detail = '') {
+    const rows = readArray(STORAGE_AUDIT);
+    rows.unshift({ id: makeId(), action, detail, createdAt: new Date().toISOString() });
+    writeArray(STORAGE_AUDIT, rows.slice(0, 100));
+    renderAudit();
+  }
+
+  function isApiConfigured() {
+    return /^https:\/\/.+/.test(API_BASE_URL) && !API_BASE_URL.includes('PASTE_YOUR_WORKER_URL_HERE');
+  }
+
+  function setApiStatus(status, mode = 'unknown', message = '') {
+    apiOnline = status === 'online';
+    apiMode = mode;
+
+    const dot = $('#apiDot');
+    dot.classList.remove('online', 'offline');
+    if (status === 'online') dot.classList.add('online');
+    if (status === 'offline') dot.classList.add('offline');
+
+    $('#apiStatusText').textContent = status === 'online' ? `API подключён • ${mode}` : 'API не подключён';
+    $('#apiCardTitle').textContent = status === 'online' ? 'Sandbox API online' : 'Sandbox API offline';
+    $('#apiCardSubtitle').textContent = message || (status === 'online' ? API_BASE_URL.replace(/^https:\/\//, '') : 'Укажи URL Worker в config.js');
+    $('#statApi').textContent = status === 'online' ? 'Online' : 'Offline';
+    $('#statApiNote').textContent = status === 'online' ? `${mode} provider` : 'нужен Cloudflare Worker';
+    $('#statMode').textContent = mode === 'sandbox' ? 'Sandbox' : mode === 'live' ? 'Live' : '—';
+  }
+
+  async function checkApi() {
+    if (!isApiConfigured()) {
+      setApiStatus('offline', 'unknown', 'Вставь адрес Worker в config.js');
+      return;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 7000);
+      const response = await fetch(`${API_BASE_URL}/api/health`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok !== true) throw new Error(data.error || 'Health check failed');
+      setApiStatus('online', data.mode || 'sandbox');
+    } catch (error) {
+      setApiStatus('offline', 'unknown', 'Worker не отвечает или CORS не настроен');
+      console.warn('VeriCore API health error:', error);
+    }
   }
 
   function switchView(viewName) {
-    $$('.side-item').forEach(button => {
-      button.classList.toggle('active', button.dataset.view === viewName);
-    });
+    $$('.side-link').forEach(button => button.classList.toggle('active', button.dataset.view === viewName));
     $$('.view').forEach(view => view.classList.remove('active'));
     $(`#view-${viewName}`)?.classList.add('active');
 
     const titles = {
-      overview:'Обзор',
-      'new-check':'Новая проверка',
-      reports:'Отчёты',
-      clients:'Клиенты',
-      audit:'Audit log'
+      overview: 'Обзор',
+      'new-check': 'Новая проверка',
+      reports: 'Отчёты',
+      audit: 'Audit log'
     };
-    workspaceTitle.textContent = titles[viewName] || 'Workspace';
+    $('#workspaceTitle').textContent = titles[viewName] || 'Workspace';
 
     if (viewName === 'overview') renderOverview();
     if (viewName === 'reports') renderReports();
-    if (viewName === 'clients') renderClients();
     if (viewName === 'audit') renderAudit();
+
+    document.querySelector('#workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function generateDemoScores(type) {
-    const values = {
-      ssn:{ identityScore:94, creditScore:null, risk:'Low' },
-      credit:{ identityScore:88, creditScore:731, risk:'Low' },
-      full:{ identityScore:92, creditScore:742, risk:'Low' }
-    };
-    return values[type] || values.full;
+  function fillDemoForm(openView = true) {
+    if (openView) switchView('new-check');
+    $('#fullName').value = TEST_PROFILE.fullName;
+    $('#dob').value = TEST_PROFILE.dob;
+    $('#ssn').value = TEST_PROFILE.ssn;
+    $('#email').value = TEST_PROFILE.email;
+    $('#purpose').value = TEST_PROFILE.purpose;
+    $('#state').value = TEST_PROFILE.state;
+    $('#selfCheck').checked = true;
+    $('#consent').checked = true;
+    $('#sandboxConfirm').checked = true;
+    formMessage.textContent = '';
+    formMessage.classList.remove('success');
   }
 
-  function validateDemo(formData) {
-    const rawSSN = String(formData.get('ssn') || '').replace(/\D/g, '');
-    if (rawSSN !== DEMO_SSN_DIGITS) {
-      return 'Разрешён только невозможный тестовый SSN 000-12-3456.';
+  function validatePayload(payload) {
+    if (!form.checkValidity()) return 'Заполни все обязательные поля.';
+    if (!payload.selfCheck || !payload.consentAccepted || !payload.sandboxConfirmed) {
+      return 'Подтверди все три пункта согласия.';
     }
-    if (!$('#consent').checked || !$('#demoConfirm').checked) {
-      return 'Подтверди согласие владельца данных и демонстрационный режим.';
+
+    const normalized = payload.ssn.replace(/\D/g, '');
+    if (apiMode !== 'live' && normalized !== '000123456') {
+      return 'В sandbox разрешён только тестовый SSN 000-12-3456.';
     }
-    if (!form.checkValidity()) {
-      return 'Заполни все обязательные поля.';
+
+    if (apiMode !== 'live' && (
+      payload.fullName.trim().toLowerCase() !== 'demo user' ||
+      payload.dob !== TEST_PROFILE.dob
+    )) {
+      return 'Для sandbox используй тестовый профиль Demo User / 1990-01-15.';
     }
+
     return '';
   }
 
-  function createReport(formData) {
-    const type = String(formData.get('checkType') || 'ssn');
-    const typeLabel = {
-      ssn:'SSN Verification',
-      credit:'Credit Insights',
-      full:'Full Identity Report'
-    }[type] || 'Verification';
-    const scores = generateDemoScores(type);
-
+  function makePayload(formData) {
     return {
-      id:makeId(),
-      reference:makeReference(),
-      name:String(formData.get('fullName') || '').trim(),
-      email:String(formData.get('email') || '').trim().toLowerCase(),
-      dob:String(formData.get('dob') || ''),
-      ssn:maskSSN(formData.get('ssn')),
-      address:String(formData.get('address') || '').trim(),
-      city:String(formData.get('city') || '').trim(),
-      state:String(formData.get('state') || ''),
-      zip:String(formData.get('zip') || ''),
-      purpose:String(formData.get('purpose') || ''),
-      type,
-      typeLabel,
-      ...scores,
-      createdAt:new Date().toISOString()
+      requestId: makeId(),
+      checkType: String(formData.get('checkType') || 'identity'),
+      fullName: String(formData.get('fullName') || '').trim(),
+      dob: String(formData.get('dob') || ''),
+      ssn: String(formData.get('ssn') || '').trim(),
+      email: String(formData.get('email') || '').trim().toLowerCase(),
+      purpose: String(formData.get('purpose') || ''),
+      state: String(formData.get('state') || ''),
+      selfCheck: $('#selfCheck').checked,
+      consentAccepted: $('#consent').checked,
+      sandboxConfirmed: $('#sandboxConfirm').checked,
+      consentTimestamp: new Date().toISOString()
     };
   }
 
-  function renderOverview() {
-    const reports = readStorage(STORAGE_REPORTS);
-    const audits = readStorage(STORAGE_AUDIT);
-    const clients = getClients(reports);
-    const today = reports.filter(report => sameLocalDay(report.createdAt, new Date())).length;
-
-    $('#statReports').textContent = String(reports.length);
-    $('#statClients').textContent = String(clients.length);
-    $('#statToday').textContent = String(today);
-    $('#reportsBadge').textContent = String(reports.length);
-    $('#clientsBadge').textContent = String(clients.length);
-
-    const recent = audits.slice(0, 5);
-    $('#overviewActivity').innerHTML = recent.length
-      ? recent.map(row => `
-        <div class="activity-row">
-          <span class="activity-icon">${row.action.includes('completed') ? '✓' : '•'}</span>
-          <div><strong>${escapeHtml(row.action)}</strong><span>${escapeHtml(row.detail || '—')}</span></div>
-          <time>${formatDate(row.time)}</time>
-        </div>`).join('')
-      : '<div class="empty-state">Активности пока нет. Создай первый демо-отчёт.</div>';
-  }
-
-  function getFilteredReports() {
-    const query = ($('#reportSearch')?.value || '').trim().toLowerCase();
-    const type = $('#reportTypeFilter')?.value || 'all';
-    return readStorage(STORAGE_REPORTS).filter(report => {
-      const matchesType = type === 'all' || report.type === type;
-      const haystack = `${report.name} ${report.email} ${report.reference} ${report.ssn}`.toLowerCase();
-      return matchesType && (!query || haystack.includes(query));
-    });
-  }
-
-  function renderReports() {
-    const reports = getFilteredReports();
-    if (!reports.length) {
-      reportList.innerHTML = '<div class="empty-state">По выбранным условиям отчётов нет.</div>';
-      renderOverview();
-      return;
-    }
-
-    reportList.innerHTML = reports.map(report => `
-      <div class="report-item">
-        <div><strong>${escapeHtml(report.name)}</strong><br><span>${escapeHtml(report.reference)} · ${escapeHtml(report.ssn)}</span></div>
-        <div><strong>${escapeHtml(report.typeLabel)}</strong><br><span>${formatDate(report.createdAt)}</span></div>
-        <div><strong style="color:var(--accent)">${escapeHtml(report.risk || 'Low')} risk</strong><br><span>${report.creditScore ? `Score ${escapeHtml(report.creditScore)}` : 'Identity demo'}</span></div>
-        <div class="report-actions">
-          <button class="report-open" type="button" data-open-report="${escapeHtml(report.id)}">Открыть</button>
-          <button class="report-delete" type="button" data-delete-report="${escapeHtml(report.id)}">Удалить</button>
-        </div>
-      </div>`).join('');
-
-    renderOverview();
-  }
-
-  function getClients(reports = readStorage(STORAGE_REPORTS)) {
-    const map = new Map();
-    for (const report of reports) {
-      const key = report.email || report.name.toLowerCase();
-      const existing = map.get(key);
-      if (!existing) {
-        map.set(key, {
-          name:report.name,
-          email:report.email || '—',
-          ssn:report.ssn,
-          city:report.city,
-          state:report.state,
-          reports:1,
-          lastCheck:report.createdAt
-        });
-      } else {
-        existing.reports += 1;
-        if (new Date(report.createdAt) > new Date(existing.lastCheck)) existing.lastCheck = report.createdAt;
-      }
-    }
-    return [...map.values()].sort((a, b) => new Date(b.lastCheck) - new Date(a.lastCheck));
-  }
-
-  function renderClients() {
-    const clients = getClients();
-    if (!clients.length) {
-      clientList.innerHTML = '<div class="empty-state">Клиентов пока нет. Они появятся после первой демо-проверки.</div>';
-      renderOverview();
-      return;
-    }
-
-    clientList.innerHTML = clients.map(client => `
-      <article class="client-card">
-        <div class="client-avatar">${escapeHtml(initials(client.name))}</div>
-        <h4>${escapeHtml(client.name)}</h4>
-        <p>${escapeHtml(client.email)}</p>
-        <div class="client-meta">
-          <div><span>SSN</span><strong>${escapeHtml(client.ssn)}</strong></div>
-          <div><span>Локация</span><strong>${escapeHtml(`${client.city || '—'}, ${client.state || '—'}`)}</strong></div>
-          <div><span>Отчётов</span><strong>${escapeHtml(client.reports)}</strong></div>
-          <div><span>Последняя проверка</span><strong>${formatDateOnly(client.lastCheck)}</strong></div>
-        </div>
-      </article>`).join('');
-
-    renderOverview();
-  }
-
-  function renderAudit() {
-    const rows = readStorage(STORAGE_AUDIT);
-    if (!rows.length) {
-      auditList.innerHTML = '<div class="empty-state">Журнал пока пуст.</div>';
-      renderOverview();
-      return;
-    }
-
-    auditList.innerHTML = rows.map(row => `
-      <div class="audit-item">
-        <span>${formatDate(row.time)}</span>
-        <div><strong>${escapeHtml(row.action)}</strong><br><span>${escapeHtml(row.detail || '—')}</span></div>
-        <span>Local demo</span>
-      </div>`).join('');
-
-    renderOverview();
-  }
-
-  function sampleReport() {
-    return {
-      id:null,
-      reference:'DEMO-VC-SAMPLE',
-      name:'Alex Demo',
-      email:'alex.demo@example.com',
-      dob:'1990-01-15',
-      ssn:'***-**-3456',
-      address:'100 Demo Avenue',
-      city:'Austin',
-      state:'TX',
-      zip:'78701',
-      purpose:'user_request',
-      type:'full',
-      typeLabel:'Full Identity Report',
-      identityScore:92,
-      creditScore:742,
-      risk:'Low',
-      createdAt:new Date().toISOString()
+  function saveReport(apiResult, payload) {
+    const report = {
+      id: apiResult.reportId || makeId(),
+      reference: apiResult.reference || `VC-${Date.now().toString().slice(-8)}`,
+      providerMode: apiResult.providerMode || apiResult.mode || 'sandbox',
+      checkType: payload.checkType,
+      fullName: payload.fullName,
+      email: payload.email,
+      dob: payload.dob,
+      maskedSsn: apiResult.maskedSsn || apiResult.subject?.maskedSsn || '***-**-3456',
+      purpose: payload.purpose,
+      state: payload.state,
+      identity: apiResult.identity ? {
+        ...apiResult.identity,
+        match: apiResult.identity.match ?? apiResult.identity.verified ?? null
+      } : null,
+      credit: apiResult.credit || null,
+      risk: apiResult.risk || { level: 'Unknown' },
+      createdAt: apiResult.createdAt || new Date().toISOString(),
+      disclaimer: apiResult.disclaimer || 'Sandbox result'
     };
+
+    const reports = readArray(STORAGE_REPORTS);
+    reports.unshift(report);
+    writeArray(STORAGE_REPORTS, reports.slice(0, 100));
+    return report;
   }
 
-  function resultRow(label, value, ok = false) {
-    return `<div class="result-row"><span>${escapeHtml(label)}</span><strong${ok ? ' class="ok"' : ''}>${escapeHtml(value)}</strong></div>`;
-  }
-
-  function buildReportSections(report) {
-    const identity = `
-      <section>
-        <h3>Identity verification</h3>
-        ${resultRow('Name & date of birth', 'Simulated match', true)}
-        ${resultRow('SSN pattern', 'Invalid-for-real demo pattern', true)}
-        ${resultRow('Address match', 'Simulated confirmed', true)}
-        ${resultRow('Consent record', purposeLabel(report.purpose), true)}
-      </section>`;
-
-    const credit = `
-      <section>
-        <h3>Credit indicators</h3>
-        ${resultRow('Generated score', report.creditScore || 'Not requested')}
-        ${resultRow('Open accounts', report.creditScore ? '7' : '—')}
-        ${resultRow('Utilization', report.creditScore ? '24%' : '—')}
-        ${resultRow('Hard inquiries', report.creditScore ? '1' : '—')}
-      </section>`;
-
-    const security = `
-      <section>
-        <h3>Demo security record</h3>
-        ${resultRow('Stored SSN', report.ssn, true)}
-        ${resultRow('Full SSN stored', 'No', true)}
-        ${resultRow('External provider', 'Not connected')}
-        ${resultRow('Data source', 'Browser-generated demo')}
-      </section>`;
-
-    if (report.type === 'ssn') return identity + security;
-    if (report.type === 'credit') return credit + security;
-    return identity + credit;
-  }
-
-  function openReport(reportId = null) {
-    const report = reportId
-      ? readStorage(STORAGE_REPORTS).find(row => row.id === reportId)
-      : sampleReport();
-
-    if (!report) {
-      showToast('Отчёт не найден.');
-      return;
-    }
-
-    currentReportId = report.id;
-    $('#reportTitle').textContent = report.typeLabel;
-    $('#reportReference').textContent = `Reference: ${report.reference} · ${formatDate(report.createdAt)}`;
-    $('#reportIdentityScore').textContent = `${report.identityScore ?? 92}%`;
-    $('#reportCreditScore').textContent = report.creditScore ?? 'N/A';
-    $('#reportRisk').textContent = report.risk || 'Low';
-    $('#reportPerson').innerHTML = `
-      <div><strong>${escapeHtml(report.name)}</strong><span>${escapeHtml(report.email)}</span></div>
-      <div><strong>${escapeHtml(report.ssn)}</strong><span>${escapeHtml(`${report.city || '—'}, ${report.state || '—'} ${report.zip || ''}`)}</span></div>`;
-    $('#reportColumns').innerHTML = buildReportSections(report);
-    $('#deleteReportBtn').hidden = !report.id;
-
-    if (typeof modal.showModal === 'function') modal.showModal();
-    else modal.setAttribute('open', '');
-  }
-
-  function closeReport() {
-    if (typeof modal.close === 'function') modal.close();
-    else modal.removeAttribute('open');
-    currentReportId = null;
-  }
-
-  function deleteReport(reportId) {
-    const reports = readStorage(STORAGE_REPORTS);
-    const report = reports.find(row => row.id === reportId);
-    if (!report) return;
-
-    writeStorage(STORAGE_REPORTS, reports.filter(row => row.id !== reportId));
-    addAudit('Demo report deleted', report.reference);
-    renderReports();
-    renderClients();
-    showToast('Отчёт удалён из браузера.');
-  }
-
-  function exportReports() {
-    const reports = readStorage(STORAGE_REPORTS).map(report => ({
-      ...report,
-      notice:'SIMULATED DATA ONLY — no credit bureau or SSN provider used.'
-    }));
-
-    if (!reports.length) {
-      showToast('Нет отчётов для экспорта.');
-      return;
-    }
-
-    const blob = new Blob([JSON.stringify(reports, null, 2)], { type:'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `vericore-demo-reports-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    addAudit('Demo reports exported', `${reports.length} record(s)`);
-    showToast('JSON-файл подготовлен.');
-  }
-
-  function applyTheme(theme) {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem(STORAGE_THEME, theme);
-    $('#themeToggleBtn').textContent = theme === 'light' ? '◑' : '◐';
-  }
-
-  $$('input[name="checkType"]').forEach(input => {
-    input.addEventListener('change', () => {
-      $$('.type-card').forEach(card => {
-        const radio = $('input[name="checkType"]', card);
-        card.classList.toggle('selected', Boolean(radio?.checked));
-      });
-    });
-  });
-
-  $('#ssn').addEventListener('input', event => {
-    const digits = event.target.value.replace(/\D/g, '').slice(0, 9);
-    const groups = [];
-    if (digits.length) groups.push(digits.slice(0, 3));
-    if (digits.length > 3) groups.push(digits.slice(3, 5));
-    if (digits.length > 5) groups.push(digits.slice(5, 9));
-    event.target.value = groups.join('-');
-  });
-
-  form.addEventListener('submit', event => {
+  async function submitVerification(event) {
     event.preventDefault();
     formMessage.textContent = '';
-    const data = new FormData(form);
-    const error = validateDemo(data);
+    formMessage.classList.remove('success');
 
-    if (error) {
-      formMessage.textContent = error;
+    if (!apiOnline) {
+      formMessage.textContent = 'Cloudflare Worker пока не подключён. Сначала выполни шаги из START-HERE.txt.';
+      return;
+    }
+
+    const payload = makePayload(new FormData(form));
+    const validationError = validatePayload(payload);
+    if (validationError) {
+      formMessage.textContent = validationError;
       form.reportValidity();
       return;
     }
 
-    const report = createReport(data);
-    const reports = readStorage(STORAGE_REPORTS);
-    reports.unshift(report);
-    writeStorage(STORAGE_REPORTS, reports.slice(0, 100));
-    addAudit('Verification completed', `${report.reference} · ${report.typeLabel} · ${report.ssn}`);
-
-    const submitButton = $('.submit-btn');
     submitButton.disabled = true;
-    $('span', submitButton).textContent = 'Генерация отчёта…';
+    submitButton.textContent = 'Проверяем…';
 
-    setTimeout(() => {
-      submitButton.disabled = false;
-      $('span', submitButton).textContent = 'Запустить демо-проверку';
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+
+      const report = saveReport(data, payload);
+      addAudit('Sandbox verification completed', `${report.reference} • ${report.maskedSsn}`);
+      formMessage.textContent = 'Проверка завершена. Создан маскированный sandbox-отчёт.';
+      formMessage.classList.add('success');
+      $('#ssn').value = '';
+      openReport(report);
+      renderOverview();
       renderReports();
-      renderClients();
-      openReport(report.id);
-      showToast('Демо-отчёт создан.');
-    }, 550);
-  });
+    } catch (error) {
+      formMessage.textContent = `Ошибка API: ${error.message}`;
+      addAudit('Verification failed', error.message);
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Запустить sandbox-проверку';
+    }
+  }
 
-  $$('.side-item').forEach(button => {
-    button.addEventListener('click', () => switchView(button.dataset.view));
-  });
+  function renderOverview() {
+    const reports = readArray(STORAGE_REPORTS);
+    const today = new Date().toDateString();
+    $('#statReports').textContent = String(reports.length);
+    $('#statToday').textContent = String(reports.filter(row => new Date(row.createdAt).toDateString() === today).length);
 
-  $$('[data-view-jump]').forEach(button => {
-    button.addEventListener('click', () => switchView(button.dataset.viewJump));
-  });
+    const container = $('#recentReports');
+    if (!reports.length) {
+      container.className = 'empty-state';
+      container.textContent = 'Пока нет отчётов.';
+      return;
+    }
 
-  $('#openDashboardBtn').addEventListener('click', () => {
-    $('#workspace').scrollIntoView({ behavior:'smooth' });
-    switchView('overview');
-  });
+    container.className = '';
+    container.innerHTML = reports.slice(0, 4).map(reportRowHtml).join('');
+    bindReportButtons(container);
+  }
 
-  $('#viewSampleBtn').addEventListener('click', () => {
-    addAudit('Sample report opened', 'Landing page');
-    openReport();
-  });
+  function reportRowHtml(report) {
+    const identityStatus = report.identity?.match === true ? 'Match' : report.identity?.match === false ? 'No match' : '—';
+    const creditScore = report.credit?.score ?? '—';
+    return `
+      <div class="report-row">
+        <div class="report-main"><strong>${escapeHtml(report.fullName)}</strong><span>${escapeHtml(report.reference)} • ${escapeHtml(report.maskedSsn)}</span></div>
+        <div class="report-cell"><span>Identity</span><strong>${escapeHtml(identityStatus)}</strong></div>
+        <div class="report-cell"><span>Credit</span><strong>${escapeHtml(creditScore)}</strong></div>
+        <button class="report-action" type="button" data-report-id="${escapeHtml(report.id)}">Открыть</button>
+      </div>`;
+  }
 
-  $('#themeToggleBtn').addEventListener('click', () => {
-    applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
-  });
+  function renderReports() {
+    const reports = readArray(STORAGE_REPORTS);
+    const container = $('#reportList');
+    if (!reports.length) {
+      container.className = 'report-list empty-state';
+      container.textContent = 'Пока нет отчётов.';
+      return;
+    }
+    container.className = 'report-list';
+    container.innerHTML = reports.map(reportRowHtml).join('');
+    bindReportButtons(container);
+  }
 
-  $('#closeModalBtn').addEventListener('click', closeReport);
-  $('#doneReportBtn').addEventListener('click', closeReport);
-  $('#printReportBtn').addEventListener('click', () => window.print());
-  $('#exportReportsBtn').addEventListener('click', exportReports);
-  $('#reportSearch').addEventListener('input', renderReports);
-  $('#reportTypeFilter').addEventListener('change', renderReports);
+  function bindReportButtons(root) {
+    $$('[data-report-id]', root).forEach(button => {
+      button.addEventListener('click', () => {
+        const report = readArray(STORAGE_REPORTS).find(row => row.id === button.dataset.reportId);
+        if (report) openReport(report);
+      });
+    });
+  }
 
-  $('#clearAuditBtn').addEventListener('click', () => {
-    if (!window.confirm('Очистить локальный audit log?')) return;
-    writeStorage(STORAGE_AUDIT, []);
+  function renderAudit() {
+    const rows = readArray(STORAGE_AUDIT);
+    const container = $('#auditList');
+    if (!rows.length) {
+      container.className = 'audit-list empty-state';
+      container.textContent = 'Пока нет событий.';
+      return;
+    }
+    container.className = 'audit-list';
+    container.innerHTML = rows.map(row => `
+      <div class="audit-row">
+        <span>${escapeHtml(formatDate(row.createdAt))}</span>
+        <div><strong>${escapeHtml(row.action)}</strong><p>${escapeHtml(row.detail || '—')}</p></div>
+      </div>`).join('');
+  }
+
+  function openReport(report) {
+    const identity = report.identity || {};
+    const credit = report.credit || {};
+    const matchText = identity.match === true ? 'Matched' : identity.match === false ? 'Not matched' : 'Not requested';
+    const deathText = identity.deathIndicator === true ? 'Yes' : identity.deathIndicator === false ? 'No' : '—';
+    const creditText = credit.score ?? 'Not requested';
+
+    modalContent.innerHTML = `
+      <span class="micro-label">${escapeHtml(String(report.providerMode || 'sandbox').toUpperCase())} REPORT</span>
+      <h2 class="modal-title">Verification result</h2>
+      <p class="modal-subtitle">${escapeHtml(report.reference)} • ${escapeHtml(formatDate(report.createdAt))}</p>
+
+      <div class="modal-score-grid">
+        <div class="modal-score"><span>Identity match</span><strong>${escapeHtml(matchText)}</strong><small>Confidence: ${escapeHtml(identity.confidence ?? '—')}%</small></div>
+        <div class="modal-score"><span>Credit score</span><strong>${escapeHtml(creditText)}</strong><small>${escapeHtml(credit.model || 'Not requested')}</small></div>
+      </div>
+
+      <div class="details-grid">
+        <div><span>Full name</span><strong>${escapeHtml(report.fullName)}</strong></div>
+        <div><span>SSN</span><strong>${escapeHtml(report.maskedSsn)}</strong></div>
+        <div><span>Date of birth</span><strong>${escapeHtml(report.dob)}</strong></div>
+        <div><span>Death indicator</span><strong>${escapeHtml(deathText)}</strong></div>
+        <div><span>Risk level</span><strong>${escapeHtml(report.risk?.level || '—')}</strong></div>
+        <div><span>Provider</span><strong>${escapeHtml(identity.source || credit.source || 'Sandbox')}</strong></div>
+      </div>
+
+      <div class="notice warning" style="margin-top:20px">
+        <strong>Sandbox disclaimer</strong>
+        <span>${escapeHtml(report.disclaimer || 'This result is simulated and is not sourced from SSA or a consumer reporting agency.')}</span>
+      </div>`;
+
+    if (typeof reportModal.showModal === 'function') reportModal.showModal();
+  }
+
+  function showSampleReport() {
+    openReport({
+      id: 'sample',
+      reference: 'VC-SAMPLE-3001',
+      providerMode: 'sandbox',
+      fullName: 'Demo User',
+      dob: '1990-01-15',
+      maskedSsn: '***-**-3456',
+      identity: { match: true, confidence: 94, deathIndicator: false, source: 'VeriCore Sandbox' },
+      credit: { score: 742, model: 'DemoScore 3.0', source: 'VeriCore Sandbox' },
+      risk: { level: 'Low' },
+      createdAt: new Date().toISOString(),
+      disclaimer: 'Simulated result. Not returned by SSA, Experian, Equifax, TransUnion, or any consumer reporting agency.'
+    });
+  }
+
+  function applyTheme(theme) {
+    document.body.classList.toggle('light', theme === 'light');
+    localStorage.setItem(STORAGE_THEME, theme);
+  }
+
+  function bindEvents() {
+    $$('.side-link').forEach(button => button.addEventListener('click', () => switchView(button.dataset.view)));
+    $$('[data-view-link]').forEach(button => button.addEventListener('click', () => switchView(button.dataset.viewLink)));
+    $('#newCheckTopButton').addEventListener('click', () => switchView('new-check'));
+    $('#fillDemoButton').addEventListener('click', () => fillDemoForm(true));
+    $('#sampleReportButton').addEventListener('click', showSampleReport);
+    $('#closeModalButton').addEventListener('click', () => reportModal.close());
+    reportModal.addEventListener('click', event => {
+      if (event.target === reportModal) reportModal.close();
+    });
+    $('#ssn').addEventListener('input', event => { event.target.value = formatSsnInput(event.target.value); });
+    form.addEventListener('submit', submitVerification);
+
+    $('#clearReportsButton').addEventListener('click', () => {
+      if (!confirm('Удалить локальную историю отчётов?')) return;
+      localStorage.removeItem(STORAGE_REPORTS);
+      addAudit('Local report history cleared');
+      renderReports();
+      renderOverview();
+      showToast('История отчётов очищена.');
+    });
+
+    $('#clearAuditButton').addEventListener('click', () => {
+      if (!confirm('Очистить журнал действий?')) return;
+      localStorage.removeItem(STORAGE_AUDIT);
+      renderAudit();
+      showToast('Audit log очищен.');
+    });
+
+    $('#themeToggle').addEventListener('click', () => {
+      applyTheme(document.body.classList.contains('light') ? 'dark' : 'light');
+    });
+  }
+
+  function init() {
+    applyTheme(localStorage.getItem(STORAGE_THEME) || 'dark');
+    bindEvents();
+    renderOverview();
+    renderReports();
     renderAudit();
-    showToast('Audit log очищен.');
-  });
+    checkApi();
+  }
 
-  reportList.addEventListener('click', event => {
-    const openButton = event.target.closest('[data-open-report]');
-    const deleteButton = event.target.closest('[data-delete-report]');
-    if (openButton) openReport(openButton.dataset.openReport);
-    if (deleteButton && window.confirm('Удалить этот демо-отчёт?')) deleteReport(deleteButton.dataset.deleteReport);
-  });
-
-  $('#deleteReportBtn').addEventListener('click', () => {
-    if (!currentReportId || !window.confirm('Удалить открытый демо-отчёт?')) return;
-    const id = currentReportId;
-    closeReport();
-    deleteReport(id);
-  });
-
-  modal.addEventListener('click', event => {
-    if (event.target === modal) closeReport();
-  });
-
-  migrateV1();
-  applyTheme(localStorage.getItem(STORAGE_THEME) || 'dark');
-  renderOverview();
-  renderReports();
-  renderClients();
-  renderAudit();
-  console.info('VeriCore Demo V2.1 loaded');
+  init();
 })();
