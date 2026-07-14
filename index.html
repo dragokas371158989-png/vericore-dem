@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07111f" />
+  <meta name="description" content="VeriCore — демонстрационный интерфейс проверки личности, SSN и кредитных показателей с обязательным согласием пользователя." />
+  <title>VeriCore — Identity & Credit Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=1" />
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="VeriCore home">
+      <span class="brand-mark">V</span>
+      <span>VeriCore</span>
+    </a>
+    <nav class="nav" aria-label="Основная навигация">
+      <a href="#features">Возможности</a>
+      <a href="#workspace">Проверка</a>
+      <a href="#security">Безопасность</a>
+    </nav>
+    <button class="ghost-btn" id="openDashboardBtn" type="button">Открыть кабинет</button>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> Identity verification platform</div>
+        <h1>Проверка личности, SSN и кредитных показателей <em>в одном интерфейсе</em></h1>
+        <p>
+          Демонстрационный MVP для легальных проверок с явным согласием владельца данных,
+          журналом действий и подготовленной архитектурой под подключение лицензированных API.
+        </p>
+        <div class="hero-actions">
+          <a class="primary-btn" href="#workspace">Запустить демо-проверку</a>
+          <button class="secondary-btn" id="viewSampleBtn" type="button">Посмотреть пример отчёта</button>
+        </div>
+        <div class="trust-row">
+          <div><strong>256-bit</strong><span>шифрование интерфейса</span></div>
+          <div><strong>Consent</strong><span>обязательное согласие</span></div>
+          <div><strong>Audit</strong><span>журнал каждой проверки</span></div>
+        </div>
+      </div>
+
+      <div class="hero-panel" aria-label="Пример интерфейса">
+        <div class="panel-head">
+          <div>
+            <span class="mini-label">Verification report</span>
+            <h2>Identity confidence</h2>
+          </div>
+          <span class="status-pill success">Verified</span>
+        </div>
+        <div class="score-ring" style="--score: 92">
+          <div><strong>92%</strong><span>match</span></div>
+        </div>
+        <div class="metric-grid">
+          <div class="metric"><span>Name & DOB</span><strong>Match</strong></div>
+          <div class="metric"><span>SSN format</span><strong>Valid</strong></div>
+          <div class="metric"><span>Address</span><strong>Confirmed</strong></div>
+          <div class="metric"><span>Risk signals</span><strong>Low</strong></div>
+        </div>
+        <div class="credit-preview">
+          <div>
+            <span>Credit insight</span>
+            <strong>742</strong>
+          </div>
+          <div class="spark" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+        </div>
+        <p class="demo-note">Все значения на этой странице — демонстрационные.</p>
+      </div>
+    </section>
+
+    <section class="logo-strip" aria-label="Категории проверок">
+      <span>SSN VERIFICATION</span>
+      <span>IDENTITY MATCH</span>
+      <span>CREDIT INSIGHTS</span>
+      <span>CONSENT RECORDS</span>
+      <span>FRAUD SIGNALS</span>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-heading">
+        <span class="mini-label">Core modules</span>
+        <h2>Один сервис вместо нескольких разрозненных проверок</h2>
+        <p>Структура уже разделена на независимые модули, чтобы позже подключить реальные провайдеры без полной переделки сайта.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card featured">
+          <div class="icon">01</div>
+          <h3>SSN Verification</h3>
+          <p>Проверка формата, совпадения имени и даты рождения, статуса номера и возможных несоответствий.</p>
+          <ul><li>Identity match</li><li>Death-file signal</li><li>Issuance pattern</li></ul>
+        </article>
+        <article class="feature-card">
+          <div class="icon">02</div>
+          <h3>Credit Insights</h3>
+          <p>Отображение кредитного рейтинга, уровня риска, счетов, просрочек и основных факторов.</p>
+          <ul><li>Score range</li><li>Open accounts</li><li>Risk factors</li></ul>
+        </article>
+        <article class="feature-card">
+          <div class="icon">03</div>
+          <h3>Full Identity Report</h3>
+          <p>Единый отчёт по имени, дате рождения, адресу, телефону, email и fraud-сигналам.</p>
+          <ul><li>Address history</li><li>Contact match</li><li>Risk alerts</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="workspace-section" id="workspace">
+      <div class="workspace-wrap">
+        <aside class="sidebar">
+          <div class="sidebar-brand">
+            <span class="brand-mark small">V</span>
+            <div><strong>VeriCore</strong><span>Demo workspace</span></div>
+          </div>
+          <button class="side-item active" data-view="new-check" type="button"><span>＋</span>Новая проверка</button>
+          <button class="side-item" data-view="reports" type="button"><span>▣</span>Отчёты</button>
+          <button class="side-item" data-view="audit" type="button"><span>⌁</span>Audit log</button>
+          <div class="side-bottom">
+            <div class="demo-badge"><strong>DEMO MODE</strong><span>Реальные данные не отправляются</span></div>
+          </div>
+        </aside>
+
+        <div class="workspace-content">
+          <div class="workspace-top">
+            <div><span class="mini-label">Secure workspace</span><h2 id="workspaceTitle">Новая проверка</h2></div>
+            <div class="user-chip"><span>AG</span><div><strong>Administrator</strong><small>Demo account</small></div></div>
+          </div>
+
+          <div class="view active" id="view-new-check">
+            <div class="alert warning"><strong>Демонстрационный режим.</strong> Не вводите реальные SSN или персональные данные. Используйте тестовые значения, указанные под формой.</div>
+            <form id="verificationForm" novalidate>
+              <div class="form-card">
+                <div class="form-card-head"><div><span>STEP 01</span><h3>Тип проверки</h3></div></div>
+                <div class="check-type-grid">
+                  <label class="type-card selected"><input type="radio" name="checkType" value="ssn" checked><span class="type-icon">ID</span><strong>SSN Verification</strong><small>Личность + статус SSN</small></label>
+                  <label class="type-card"><input type="radio" name="checkType" value="credit"><span class="type-icon">CS</span><strong>Credit Insights</strong><small>Демо кредитного рейтинга</small></label>
+                  <label class="type-card"><input type="radio" name="checkType" value="full"><span class="type-icon">FR</span><strong>Full Report</strong><small>Полный комбинированный отчёт</small></label>
+                </div>
+              </div>
+
+              <div class="form-card">
+                <div class="form-card-head"><div><span>STEP 02</span><h3>Данные заявителя</h3></div><span class="required-note">Все поля обязательны</span></div>
+                <div class="field-grid">
+                  <label class="field"><span>Полное имя</span><input id="fullName" name="fullName" autocomplete="off" value="John Michael Doe" required /></label>
+                  <label class="field"><span>Дата рождения</span><input id="dob" name="dob" type="date" value="1988-04-16" required /></label>
+                  <label class="field"><span>SSN</span><input id="ssn" name="ssn" inputmode="numeric" autocomplete="off" placeholder="123-45-6789" value="123-45-6789" maxlength="11" required /><small>Тестовое значение: 123-45-6789</small></label>
+                  <label class="field"><span>Email</span><input id="email" name="email" type="email" autocomplete="off" value="john.doe@example.com" required /></label>
+                  <label class="field span-2"><span>Адрес</span><input id="address" name="address" autocomplete="off" value="125 Market Street" required /></label>
+                  <label class="field"><span>Город</span><input id="city" name="city" value="Austin" required /></label>
+                  <label class="field"><span>Штат</span><select id="state" name="state" required><option value="TX" selected>Texas</option><option value="CA">California</option><option value="FL">Florida</option><option value="NY">New York</option></select></label>
+                  <label class="field"><span>ZIP Code</span><input id="zip" name="zip" inputmode="numeric" value="78701" maxlength="5" required /></label>
+                  <label class="field"><span>Permissible purpose</span><select id="purpose" name="purpose" required><option value="">Выберите основание</option><option value="user_request" selected>Запрос самого пользователя</option><option value="tenant">Проверка арендатора с согласием</option><option value="employment">Проверка кандидата с согласием</option><option value="lending">Кредитная заявка</option></select></label>
+                </div>
+              </div>
+
+              <div class="form-card consent-card">
+                <div class="form-card-head"><div><span>STEP 03</span><h3>Согласие и подтверждение</h3></div></div>
+                <label class="consent-line"><input id="consent" type="checkbox" required><span><strong>Получено явное согласие владельца данных</strong><small>Я подтверждаю, что проверка проводится для законной цели, а владелец данных дал разрешение.</small></span></label>
+                <label class="consent-line"><input id="demoConfirm" type="checkbox" required><span><strong>Используются только демонстрационные данные</strong><small>Этот MVP не предназначен для обработки реальных SSN до подключения защищённого backend и лицензированного провайдера.</small></span></label>
+              </div>
+
+              <div class="form-actions">
+                <button class="primary-btn submit-btn" type="submit"><span>Запустить проверку</span><i>→</i></button>
+                <p id="formMessage" role="status"></p>
+              </div>
+            </form>
+          </div>
+
+          <div class="view" id="view-reports">
+            <div class="table-card">
+              <div class="table-head"><div><h3>Последние отчёты</h3><p>Демонстрационные записи, сохранённые в этом браузере.</p></div><button class="secondary-btn small-btn" id="newCheckFromReports" type="button">Новая проверка</button></div>
+              <div class="report-list" id="reportList"></div>
+            </div>
+          </div>
+
+          <div class="view" id="view-audit">
+            <div class="table-card">
+              <div class="table-head"><div><h3>Audit log</h3><p>История действий в демонстрационном кабинете.</p></div><button class="ghost-btn danger" id="clearAuditBtn" type="button">Очистить журнал</button></div>
+              <div class="audit-list" id="auditList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="security-section" id="security">
+      <div class="security-copy">
+        <span class="mini-label">Security by design</span>
+        <h2>Полный SSN не должен храниться в браузере или обычной базе</h2>
+        <p>В боевой версии интерфейс отправляет данные напрямую в защищённый backend. В базе сохраняются только последние четыре цифры, токен провайдера, результат, основание проверки, согласие и audit trail.</p>
+      </div>
+      <div class="security-steps">
+        <div><span>01</span><strong>Получение согласия</strong><p>Фиксируем текст, дату, IP и допустимую цель проверки.</p></div>
+        <div><span>02</span><strong>Защищённый API</strong><p>Данные уходят через сервер, а не напрямую из публичного сайта.</p></div>
+        <div><span>03</span><strong>Минимальное хранение</strong><p>Не сохраняем полный SSN и лишние персональные данные.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand" href="#home"><span class="brand-mark">V</span><span>VeriCore</span></a>
+    <p>Demo MVP • No real SSN processing • © 2026</p>
+  </footer>
+
+  <dialog class="report-modal" id="reportModal">
+    <div class="modal-shell">
+      <button class="modal-close" id="closeModalBtn" type="button" aria-label="Закрыть">×</button>
+      <div class="modal-head">
+        <div><span class="mini-label">Verification completed</span><h2>Identity & Credit Report</h2><p id="reportReference">Reference: DEMO-VC-0001</p></div>
+        <span class="status-pill success">Low risk</span>
+      </div>
+      <div class="report-summary">
+        <div class="summary-score"><span>Identity confidence</span><strong>92%</strong><small>Strong match</small></div>
+        <div class="summary-score"><span>Credit score</span><strong>742</strong><small>Very good · demo</small></div>
+        <div class="summary-score"><span>Fraud risk</span><strong>Low</strong><small>No critical signals</small></div>
+      </div>
+      <div class="report-columns">
+        <section>
+          <h3>Identity verification</h3>
+          <div class="result-row"><span>Name & date of birth</span><strong class="ok">Match</strong></div>
+          <div class="result-row"><span>SSN format</span><strong class="ok">Valid test pattern</strong></div>
+          <div class="result-row"><span>Address match</span><strong class="ok">Confirmed</strong></div>
+          <div class="result-row"><span>Death-file signal</span><strong class="ok">No match</strong></div>
+        </section>
+        <section>
+          <h3>Credit indicators</h3>
+          <div class="result-row"><span>Open accounts</span><strong>7</strong></div>
+          <div class="result-row"><span>Payment history</span><strong class="ok">On time</strong></div>
+          <div class="result-row"><span>Utilization</span><strong>24%</strong></div>
+          <div class="result-row"><span>Hard inquiries</span><strong>1</strong></div>
+        </section>
+      </div>
+      <div class="report-disclaimer"><strong>Важно:</strong> это полностью сгенерированный демо-отчёт. Он не содержит сведений кредитного бюро и не подтверждает реальный SSN.</div>
+      <div class="modal-actions"><button class="secondary-btn" id="printReportBtn" type="button">Печать отчёта</button><button class="primary-btn" id="doneReportBtn" type="button">Готово</button></div>
+    </div>
+  </dialog>
+
+  <script src="app.js?v=1"></script>
+</body>
+</html>
