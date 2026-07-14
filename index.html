@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111f" />
   <meta name="description" content="VeriCore — демонстрационный интерфейс легальной проверки личности и кредитных показателей с обязательным согласием." />
-  <title>VeriCore V2 — Identity & Credit Verification Demo</title>
+  <title>VeriCore V2.1 — Identity & Credit Verification Demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=2.1" />
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -18,7 +18,7 @@
     <a class="brand" href="#home" aria-label="VeriCore home">
       <span class="brand-mark">V</span>
       <span>VeriCore</span>
-      <small>V2 DEMO</small>
+      <small>V2.1 DEMO</small>
     </a>
 
     <nav class="nav" aria-label="Основная навигация">
@@ -46,7 +46,9 @@
         <div class="hero-actions">
           <a class="primary-btn" href="#workspace">Открыть демо-кабинет</a>
           <button class="secondary-btn" id="viewSampleBtn" type="button">Пример отчёта</button>
+          <a class="secondary-btn secure-download" href="LOCAL-SSN-TEST.html" download>Скачать локальную проверку формата</a>
         </div>
+        <p class="local-download-note">Локальный файл проверяет только структуру твоего собственного SSN. Он не делает запросов в бюро и не показывает Credit Score.</p>
 
         <div class="trust-row">
           <div><strong>Demo only</strong><span>реальные данные заблокированы</span></div>
@@ -100,8 +102,8 @@
     <section class="section" id="features">
       <div class="section-heading">
         <span class="mini-label">CORE MODULES</span>
-        <h2>V2 уже выглядит как полноценный сервис</h2>
-        <p>Добавлены обзорная панель, клиенты, поиск отчётов, динамический отчёт, экспорт и улучшенный журнал действий.</p>
+        <h2>V2.1: демо-сервис + приватный локальный тест</h2>
+        <p>Публичный сайт остаётся безопасным демо, а отдельный локальный файл позволяет проверить только формат собственного SSN без сети и сохранения.</p>
       </div>
 
       <div class="feature-grid">
@@ -125,6 +127,13 @@
           <p>Карточки клиентов, отчёты, фильтры, экспорт JSON и локальный журнал действий.</p>
           <ul><li>Dashboard</li><li>Report search</li><li>Local audit trail</li></ul>
         </article>
+
+        <article class="feature-card secure-card">
+          <div class="icon">04</div>
+          <h3>Secure Local Format Test</h3>
+          <p>Самостоятельный HTML-файл запускается только с компьютера, отключает сетевые запросы и не сохраняет полный номер.</p>
+          <ul><li>file:// only</li><li>No storage</li><li>Format check only</li></ul>
+        </article>
       </div>
     </section>
 
@@ -133,7 +142,7 @@
         <aside class="sidebar">
           <div class="sidebar-brand">
             <span class="brand-mark small">V</span>
-            <div><strong>VeriCore</strong><span>Demo workspace V2</span></div>
+            <div><strong>VeriCore</strong><span>Demo workspace V2.1</span></div>
           </div>
 
           <button class="side-item active" data-view="overview" type="button"><span>⌂</span>Обзор</button>
@@ -332,7 +341,7 @@
 
   <footer>
     <a class="brand" href="#home"><span class="brand-mark">V</span><span>VeriCore</span></a>
-    <p>Demo V2 • No real SSN processing • © 2026</p>
+    <p>Demo V2.1 • Public demo + local format-only test • © 2026</p>
   </footer>
 
   <dialog class="report-modal" id="reportModal">
@@ -369,6 +378,6 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>

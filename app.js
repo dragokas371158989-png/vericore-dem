@@ -592,5 +592,5 @@
   renderReports();
   renderClients();
   renderAudit();
-  console.info('VeriCore Demo V2 loaded');
+  console.info('VeriCore Demo V2.1 loaded');
 })();
